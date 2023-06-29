@@ -1,0 +1,249 @@
+---
+title: "Project1"
+author: "Roy Badillo"
+date: "2023-06-15"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+```{r}
+
+library(tidyverse)
+library(tidymodels)
+library(mice)
+library(VIM)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(GGally)
+library(skimr)
+library(gridExtra)
+library(vip)
+library(glmnet)
+```
+
+
+```{r}
+ames_student_1_1_ <- read_csv("ames_student-1 (1).csv")
+View(ames_student_1_1_)
+ames = ames_student_1_1_ 
+
+```
+
+```{r}
+str(ames)
+summary(ames)
+```
+
+```{r}
+ames = ames %>% mutate(Above_Median = as_factor(Above_Median)) %>% 
+  mutate(Above_Median = fct_recode(Above_Median, "No" = "0", "Yes" = "1" ))
+  
+ames = ames %>% mutate(Fence = as_factor(Fence)) %>% mutate(Fence = fct_recode(Fence, "No_Fence" = "0", "Minimum_Wood_Wire" = "1", "Minimum_Privacy" = "2", "Good_Wood" = "3", "Good_Privacy" = "4" ))
+
+ames = ames %>% mutate(Neighborhood = as_factor(Neighborhood)) 
+
+str(ames)
+summary(ames)
+
+
+```
+
+
+
+
+```{r}
+
+ggplot(ames, aes(Fence, color = Above_Median)) + geom_bar()
+
+
+```
+
+
+
+```{r}
+
+ggplot(ames, aes(Neighborhood, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Neighborhood", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+
+#When considering Real Estate a first impulse is to consider the three rules of Real Estate, Location, Location, Location. These rules seem to be useful when considering the listings that sold Above Median Price. As evidenced in the chart below, certain neighborhoods were almost sold above Median with certainty. Some of these neighborhoods were Gilbert, Somerset, Northridge Heights, Stone Brook, Bloomington Heights, Greens, Clear Creek, Timberland and Veenker. Other neighborhoods were 70% or higher Above Median such as Northwest Ames, Sawyer West and Crawford, while some stood out for their high likelihood to be Below the Median price such as North Ames, Sawyer, Old Town, Brookside, Rail Road and Edwards
+
+
+
+```
+
+```{r}
+
+ggplot(ames, aes(Fence, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Fence Type", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+
+# Having a fence was also an indicator of pricing. Houses with fences did worse than houses with fences
+
+```
+
+```{r}
+
+
+ggplot(ames, aes(Exterior_1st, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Exterior Material", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+# The type of exterior material had an impact on the house's selling price also, Vinyl Siding was a great predictor for a house being priced above the median with over 75% of being sold above median, followed by Cement build at 63%.
+
+```
+
+```{r}
+ggplot(ames, aes(Foundation, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Foundation Type", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+
+# Poured concrete has an over 82% likelihood to sell above the median price, every other option is significantly less likely to sell above the median, 
+
+
+```
+
+```{r}
+ggplot(ames, aes(MS_Zoning, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + theme(axis.text = element_text(size = 8))
+
+# Floating Village Residential is almost a certainty to sell above median 
+
+```
+```{r}
+
+ggplot(ames, aes(Lot_Shape, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Lot Shape", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+
+# The shape of a lot has an impact on pricing too. The most irregular the shape of the lot the higher the chance for it to sell above the median price.
+
+```
+
+```{r}
+ggplot(ames, aes(Lot_Config, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + theme(axis.text = element_text(size = 8))
+
+
+```
+
+```{r}
+ggplot(ames, aes(Bldg_Type, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + labs(x ="Building Type", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+
+
+
+```
+
+```{r}
+
+ggplot(ames, aes(Overall_Qual, fill = Above_Median,)) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + labs(x ="Overall Quality", y = "Number of Homes") + theme(axis.text = element_text(size = 8)) 
+
+#The overall quality of a house is a high indicator of it selling above the median. As expected the highest quality homes with ratings of "Very Excellent", "Excellent" and "Very Good" are almost 100% above median price. Houses is the "Above Average" rating split almost evenly. The lower rating "Average" only has a 20% chance to be above the median price and every rating below that are almost a certainty to be below the median price. 
+
+```
+
+```{r}
+
+ggplot(ames, aes(Exter_Cond, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + theme(axis.text = element_text(size = 8))
+
+```
+
+
+```{r}
+
+ggplot(ames, aes(Foundation, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Foundation Type", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+
+# The type of foundation a house has significant correlation with the above median selling price as poured concrete homes sold at a 81% chance to be sold above the median, the rest of the Foundation options are not significant
+```
+
+```{r}
+
+ggplot(ames, aes(Exter_Cond, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + theme(axis.text = element_text(size = 8))
+
+```
+
+
+```{r}
+
+ggplot(ames, aes(BsmtFin_Type_1, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Finished Basement ?", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+
+```
+
+```{r}
+ggplot(ames, aes(Central_Air, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Central Air", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+
+# There is almost no chance for your home to sell above the median price if doesnt have central air.
+
+```
+
+```{r}
+ggplot(ames, aes(Kitchen_Qual, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Kitchen Quality", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+
+# Unsurprisingly the quality of a kitchen is crucial in determining the above median selling price of a house. The kitchen tends to be the focal point of a family's home and it's quality significantly dictates its pricing. Homes with Excellent Quality Kitchens almost exclusively sell above the median. Kitchens with "Good" quality also sold above the median at about 80%.
+
+```
+```{r}
+
+ggplot(ames, aes(Garage_Type, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Garage Type", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+
+# The type of garage a home has also has a significant impact on the price. Homes with built in garages almost exclusively sold above the median price and homes with attached garages sold above the median price at 78%. 
+
+```
+
+
+```{r}
+
+ggplot(ames, aes(Garage_Finish, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Finished Garage?", y = "Number of Homes") +theme(axis.text = element_text(size = 8))
+
+# If the garage of a house is not finished has a significant impact on whether the house sells below the selling median, 78% houses with unfinished basements sold below median but homes with finished garages had a 84% chance to sell above the median.
+
+```
+
+```{r}
+ggplot(ames, aes(Garage_Cond, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + theme(axis.text = element_text(size = 8))
+
+
+
+```
+
+
+```{r}
+
+
+ames2 <- select(ames, Neighborhood, Kitchen_Qual, Garage_Type, Overall_Qual, Garage_Finish, Foundation, Overall_Qual, Above_Median )
+
+ames2 = ames2 %>% mutate(Neighborhood = as_factor(Neighborhood))
+ames2 = ames2 %>% mutate(Kitchen_Qual = as_factor(Kitchen_Qual))
+ames2 = ames2 %>% mutate(Garage_Type = as_factor(Garage_Type))
+ames2 = ames2 %>% mutate(Overall_Qual = as_factor(Overall_Qual))
+ames2 = ames2 %>% mutate(Garage_Finish = as_factor(Garage_Finish))
+ames2 = ames2 %>% mutate(Foundation = as_factor(Foundation))
+ames2 = ames2 %>% mutate(Overall_Qual = as_factor(Overall_Qual))
+
+str(ames2)
+ggpairs(ames2, columns = c(4:7))
+
+
+
+```
+
+```{r}
+ggpairs(ames2, columns = c(2,3,7))
+
+
+```
+
+
+

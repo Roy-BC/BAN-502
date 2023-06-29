@@ -1,0 +1,452 @@
+---
+title: "Project2"
+author: "Roy Badillo"
+date: "2023-06-22"
+output: word_document
+---
+
+```{r First we try Lofistic Regression}
+
+library(tidyverse)
+library(tidymodels)
+library(mice)
+library(VIM)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(GGally)
+library(skimr)
+library(gridExtra)
+library(vip)
+library(glmnet)
+
+```
+
+
+```{r}
+ames_student_1_1_ <- read_csv("ames_student-1 (1).csv")
+View(ames_student_1_1_)
+ames = ames_student_1_1_ 
+
+```
+
+
+
+```{r After the first part of the project I found several variables that are signifcant so I created a smaller data frame with only these} 
+
+
+# I then eliminated a few rows from neighborhoods with just a handful of sales, and Foundation type with only a couple.
+
+ames2 <- ames[!(row.names(ames) %in% c("13","25", "69", "70","187", "190", "257", "258", "259", "260", "261", "262", "263", "264", "265", "367", "373", "374", "375", "376", "479", "601", "627", "628", "629", "666", "703", "704", "793", "794", "795", "796", "859", "880", "1075", "1157", "1259", "1278", "1279", "1280", "1281", "1282", "1554", "1555", "1665", "1668", "1749", "1759", "1760", "1761", "1762", "1763", "1851", "1957", "2029","2035")),]
+
+ames2 <- select(ames2, Neighborhood, Kitchen_Qual, Garage_Type, Overall_Qual, Garage_Finish, Foundation, Overall_Qual, Above_Median )
+
+ames2 = ames2 %>% mutate(Neighborhood = as_factor(Neighborhood))
+ames2 = ames2 %>% mutate(Kitchen_Qual = as_factor(Kitchen_Qual))
+ames2 = ames2 %>% mutate(Garage_Type = as_factor(Garage_Type))
+ames2 = ames2 %>% mutate(Overall_Qual = as_factor(Overall_Qual))
+ames2 = ames2 %>% mutate(Garage_Finish = as_factor(Garage_Finish))
+ames2 = ames2 %>% mutate(Foundation = as_factor(Foundation))
+ames2 = ames2 %>% mutate(Above_Median = as_factor(Above_Median))
+
+
+```
+
+
+
+```{r I first will use Logistic Regression}
+set.seed(123) 
+ames2_split = initial_split(ames2, prob = 0.80, strata = Above_Median)
+train = training(ames2_split)
+test = testing(ames2_split)
+```
+
+
+```{r}
+# Kitchen Quality needed to be reorganized so the results show in declining quality instead of random. 
+
+ames2 <- ames2 %>%
+  mutate(Kitchen_Qual = fct_relevel(Kitchen_Qual, "Excellent", "Good", "Typical", "Fair", "Poor"))
+
+# Then we graph it.
+
+ggplot(ames2, aes(Kitchen_Qual, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Kitchen Quality", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+
+```
+
+```{r}
+t1 = table(ames2$Above_Median,ames2$Kitchen_Qual)
+prop.table(t1, margin = 2)
+
+# Looks like a home with an "Excellent" rated kitchen has a great chance to sell above the Median, while a "Poor rated kitchen ensures the home sales below the median. As expected the kitchen quality is a key indicator.
+
+```
+```{r}
+# Overall Quality needed to be reorganized so the results show in declining quality instead of random. 
+
+ames2 <- ames2 %>%
+  mutate(Overall_Qual = fct_relevel(Overall_Qual, "Very_Excellent", "Excellent", "Very_Good", "Good", "Above_Average", "Average", "Below_Average", "Fair", "Poor", "Very_Poor"))
+
+# Then we graph it.
+
+ggplot(ames2, aes(Overall_Qual, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Overall Quality", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+```
+
+
+```{r}
+t1 = table(ames2$Above_Median,ames2$Overall_Qual)
+prop.table(t1, margin = 2)
+
+#Not surprisingly, the overall quality of the home is a clear indicator of whether it sells above or below the Median. Homes with "Above Average Ratings" sell almost evenly above or below the median, while every rating above is almost guaranteed to sell above the median and every rating below to follow suit below the median.
+
+```
+
+```{r}
+ames2 <- ames2 %>%
+  mutate(Foundation = fct_relevel(Foundation, "PConc", "CBlock", "Wood", "BrkTil", "Slab"))
+
+# Then we graph it.
+
+ggplot(ames2, aes(Foundation, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Foundation", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+
+```
+
+
+```{r}
+t1 = table(ames2$Above_Median,ames2$Foundation)
+prop.table(t1, margin = 2)
+#Poured Concrete was the best Foundation for predicting above median selling price
+
+```
+
+
+```{r}
+ames2 <- ames2 %>%
+  mutate(Garage_Type = fct_relevel(Garage_Type, "BuiltIn", "Attchd", "Basmnt", "Detchd","CarPort", "No_Garage"))
+
+# Then we graph it.
+
+ggplot(ames2, aes(Garage_Type, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Garage Type", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+```
+
+
+
+```{r}
+
+t1 = table(ames2$Above_Median,ames2$Garage_Type)
+prop.table(t1, margin = 2)
+
+#The more convenient the Garage the higher likelihood for a house to sell above the median. 
+
+
+```
+
+```{r}
+
+ames2 <- ames2 %>%
+  mutate(Garage_Finish = fct_relevel(Garage_Finish, "Fin", "RFn", "Unf", "No_Garage"))
+
+# Then we graph it.
+
+ggplot(ames2, aes(Garage_Finish, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Garage Finish", y = "Number of Homes") + theme(axis.text = element_text(size = 8))
+
+```
+
+
+
+
+```{r}
+t1 = table(ames2$Above_Median,ames2$Garage_Finish)
+prop.table(t1, margin = 2)
+
+# Whether a home has a garage and it is finished is also a crucial factor.
+
+```
+```{r}
+# I rearranged the values to show up in descending order in the graph
+
+ames2 <- ames2 %>%
+  mutate(Neighborhood = fct_relevel(Neighborhood, "Briardale", "Meadow_Village", "Iowa_DOT_and_Rail_Road",   "South_and_West_of_Iowa_State_University", "Old_Town", "Brookside","Edwards", "Sawyer", "North_Ames", "Mitchell", "Sawyer_West", "Crawford", "College_Creek","Northwest_Ames", "Somerset", "Clear_Creek", "Bloomington_Heights", "Gilbert", "Timberland", "Northridge_Heights", "Northridge", "Stone_Brook"))
+
+
+```
+
+
+```{r}
+# Then we graph it.
+
+ggplot(ames2, aes(Neighborhood, fill = Above_Median )) + geom_bar() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Neighborhood", y ="Number of Homes" ) + coord_flip()
+```
+
+
+
+
+```{r}
+t1 = table(ames2$Above_Median,ames2$Neighborhood)
+prop.table(t1, margin = 2)
+
+```
+
+```{r}
+ames2_model = 
+  logistic_reg(mode = "classification") %>%
+  set_engine("glm") 
+
+ames2_recipe = recipe(Above_Median ~ Overall_Qual, train)
+
+logreg_wf = workflow() %>%
+  add_recipe(ames2_recipe) %>% 
+  add_model(ames2_model)
+
+ames2_fit = fit(logreg_wf, train)
+
+```
+
+```{r}
+
+summary(ames2_fit$fit$fit$fit)
+```
+
+
+```{r}
+
+ames3_model = 
+  logistic_reg(mode = "classification") %>% 
+  set_engine("glm") 
+
+ames3_recipe = recipe(Above_Median ~., train)
+
+logreg_wf = workflow() %>%
+  add_recipe(ames3_recipe) %>% 
+  add_model(ames3_model)
+
+ames_fit3 = fit(logreg_wf, train)
+```
+
+```{r}
+options(scipen = 999)
+summary(ames_fit3$fit$fit$fit)
+options(scipen = 0)
+
+```
+
+
+
+
+```{r Now Random Forests} 
+# start by adding the missing libraries
+
+library(caret)
+library(ranger)
+library(randomForest)
+```
+
+
+```{r initial split with 70% in the training set }
+set.seed(123) 
+ames2_split = initial_split(ames2, prop = 0.7, strata = Above_Median)
+train = training(ames2_split)
+test = testing(ames2_split)
+
+```
+
+
+```{r k fold validation for our training set}
+
+set.seed(123)
+rf_folds = vfold_cv(train, v = 5)
+
+```
+
+
+
+```{r We try graphing it}
+
+ames2 <- ames2 %>%
+  mutate(Garage_Type = fct_relevel(Garage_Type, "BuiltIn", "Attchd", "Basment", "More_Than_Two_Types", "Detchd","CarPort", "No_Garage"))
+
+ames2 <- ames2 %>%
+  mutate(Foundation = fct_relevel(Foundation, "PConc", "Wood", "CBlock", "BrkTil", "Slab"))
+
+p1 = ggplot(train, aes(x = Garage_Finish, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Garage Finished", y ="Number of Homes" )
+p2 = ggplot(train, aes(x = Garage_Type, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6)) +  labs(x ="Garage Type", y ="Number of Homes" )
+p3 = ggplot(train, aes(x = Foundation, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Foundation Type", y ="Number of Homes" )
+p4 = ggplot(train, aes(x = Kitchen_Qual, fill = Above_Median)) + geom_bar(position = "fill") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +  labs(x ="Kitchen Quality", y ="Number of Homes" )
+grid.arrange(p1,p2,p3,p4)
+
+# I liked the graphs from the logistic regression better, but this gives us a clear image of the values play out.
+
+```
+
+```{r we graphed the last two variables}
+
+
+p1 = ggplot(train, aes(x = Neighborhood, fill = Above_Median)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = Overall_Qual, fill = Above_Median)) + geom_bar(position = "fill")
+grid.arrange(p1,p2)
+
+
+
+```
+
+```{r Now we build the model}
+
+
+ames2_recipe = recipe(Above_Median ~., train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+rf_model = rand_forest() %>% 
+  set_engine("ranger", importance = "permutation") %>% 
+  set_mode("classification")
+
+ames2_wflow = 
+  workflow() %>% 
+  add_model(rf_model) %>% 
+  add_recipe(ames2_recipe)
+
+set.seed(123)
+ames2_fit = fit(ames2_wflow, train)
+
+```
+
+
+
+
+```{r}
+trainpredrf = predict(ames2_fit, train)
+head(trainpredrf)
+
+# we ensure the predictions are clear "Yes" and "No"
+
+```
+
+```{r}
+confusionMatrix(trainpredrf$.pred_class, train$Above_Median, 
+                positive = "Yes")
+# Our train set accuracy is 91% which is pretty good compared to our naive accuracy of 51%
+
+```
+
+```{r}
+
+testpredrf = predict(ames2_fit, test)
+head(testpredrf)
+confusionMatrix(testpredrf$.pred_class, test$Above_Median, 
+                positive = "Yes")
+
+# The Test dropped a few points in accuracy at 88% 
+
+```
+ 
+```{r}
+saveRDS(ames2_fit, "ames2_fit.rds")
+```
+
+
+```{r}
+ames2_fit = readRDS("ames2_fit.rds")
+```
+
+
+```{r}
+ames2_fit %>% pull_workflow_fit() %>% vip(geom = "point")
+```
+
+
+
+```{r Lastly Classification Trees}
+# First we load the missing libraries
+
+library(rpart)
+library(rpart.plot) 
+library(RColorBrewer) 
+library(rattle) 
+```
+
+
+```{r}
+
+ames4 <- select(ames2, Kitchen_Qual, Garage_Type, Overall_Qual, Garage_Finish, Foundation, Overall_Qual, Above_Median )
+
+ames4 = ames2 %>% mutate(Above_Median= as_factor(Above_Median)) %>% 
+  mutate(Above_Median = fct_recode(Above_Median, "No" = "0", "Yes" = "1" )) 
+
+str(ames4)
+
+```
+
+```{r we do our split between train and test}
+set.seed(123) 
+ames4_split = initial_split(ames4, prop = 0.7, strata = Above_Median)
+train = training(ames4_split)
+test = testing(ames4_split)
+
+
+```
+
+```{r we build our recipe for classification trees}
+ames4_recipe = recipe(Above_Median  ~., train)
+
+tree_model = decision_tree() %>% 
+  set_engine("rpart", model = TRUE) %>% 
+  set_mode("classification")
+
+ames4_wflow = 
+  workflow() %>% 
+  add_model(tree_model) %>% 
+  add_recipe(ames4_recipe)
+
+ames4_fit = fit(ames4_wflow, train)
+
+
+```
+
+
+```{r we plot it}
+tree = ames4_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+
+fancyRpartPlot(tree)
+
+
+```
+```{r}
+fancyRpartPlot(tree, tweak = 1.3) 
+
+```
+
+
+
+```{r}
+
+ames4_fit$fit$fit$fit$cptable
+
+```
+
+```{r}
+treepred = predict(ames4_fit, train, type = "class")
+head(treepred)
+
+```
+
+```{r}
+confusionMatrix(treepred$.pred_class,train$Above_Median,positive="Yes")
+# 88% Accuracy on the training set vs a 51% naive accuracy
+
+```
+
+```{r}
+treepred_test = predict(ames4_fit, test, type = "class")
+head(treepred_test)
+```
+```{r}
+confusionMatrix(treepred_test$.pred_class,test$Above_Median,positive="Yes")
+# Marginal increase in the test set 
+
+```
+
+
+
+
